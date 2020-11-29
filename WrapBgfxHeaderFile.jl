@@ -14,13 +14,13 @@ const includes = [vcinc, ucrt, bx]
 
 const args = ["-fms-compatibility", "-ferror-limit=10"]
 
-function wrap_stuff(header::String, libName::String)
-    println("Wrapping $header")
+function wrap_stuff(rootHeader::String, filterHeaders::Array{String}, libName::String)
+    println("Wrapping $filterHeaders starting from $rootHeader")
     wrapped = Vector{String}()
     ctx = DefaultContext()
     ctx.libname = libName
 
-    parse_headers!(ctx, [header], args = args, includes = includes)
+    parse_headers!(ctx, [rootHeader], args = args, includes = includes)
 
     for trans_unit in ctx.trans_units
         root_cursor = getcursor(trans_unit)
@@ -32,7 +32,7 @@ function wrap_stuff(header::String, libName::String)
             ctx.children_index = i
             startswith(child_name, "__") && continue  # skip compiler definitions
             child_name in wrapped && continue # already Done
-            child_header != header && continue # not in the header we care about
+            !(child_header in filterHeaders) && continue # not in the list of headers we care about
             push!(wrapped, child_name)
             try
                 wrap!(ctx, child)
@@ -48,7 +48,7 @@ function wrap_stuff(header::String, libName::String)
     end
 
     # Write "common" definitions: types, typealiases, etc.
-    path = joinpath(@__DIR__, ctx.libname * "_wrap.jl")
+    path = joinpath(@__DIR__, ctx.libname * ".jl")
     println("Writing $path")
     open(path, "w") do f
         println(f, "# Automatically generated using Clang.jl\n")
@@ -59,5 +59,5 @@ function wrap_stuff(header::String, libName::String)
     println("Done")
 end
 
-wrap_stuff("bgfx\\c99\\bgfx.h", "bgfx")
+wrap_stuff("bgfx.h", ["bgfx.h", "./bgfx/c99/bgfx.h"], "Bgfx")
 
