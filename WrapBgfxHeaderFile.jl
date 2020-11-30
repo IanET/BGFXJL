@@ -59,5 +59,5 @@ function wrap_stuff(rootHeader::String, filterHeaders::Array{String}, libName::S
     println("Done")
 end
 
-wrap_stuff("bgfx.h", ["bgfx.h", "./bgfx/c99/bgfx.h"], "Bgfx")
+wrap_stuff("bgfx.h", ["./bgfx/defines.h", "bgfx.h", "./bgfx/c99/bgfx.h"], "Bgfx")
 

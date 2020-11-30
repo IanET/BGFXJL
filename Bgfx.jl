@@ -1,6 +1,6 @@
 # Automatically generated using Clang.jl
 
-const Bgfx = "Bgfx" 
+const Bgfx = "bgfx-shared-libRelease" 
 
 const BGFX_SHARED_LIB_API = 1
 
