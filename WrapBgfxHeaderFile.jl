@@ -32,6 +32,7 @@ function wrap_stuff(rootHeader::String, filterHeaders::Array{String}, libName::S
             ctx.children_index = i
             startswith(child_name, "__") && continue  # skip compiler definitions
             child_name in wrapped && continue # already Done
+            # !(child_header in filterHeaders) && @info "Ignoring $child_header"
             !(child_header in filterHeaders) && continue # not in the list of headers we care about
             push!(wrapped, child_name)
             try
@@ -59,5 +60,5 @@ function wrap_stuff(rootHeader::String, filterHeaders::Array{String}, libName::S
     println("Done")
 end
 
-wrap_stuff("bgfx.h", ["./bgfx/defines.h", "bgfx.h", "./bgfx/c99/bgfx.h"], "Bgfx")
+wrap_stuff("bgfx.h", ["./bgfx/c99/../defines.h", "bgfx.h", "./bgfx/c99/bgfx.h"], "Bgfx")
 

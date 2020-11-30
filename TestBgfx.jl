@@ -1,4 +1,4 @@
-using GLFW, CEnum
+using GLFW, GLFW_jll, CEnum
 
 include("Bgfx.jl")
 
@@ -7,7 +7,7 @@ window = GLFW.CreateWindow(640, 480, "GLFW.jl")
 bgfx_render_frame(Int32(-1));
 
 # Missing wrapper so do it by hand
-glfwGetWin32Window(window::GLFW.Window) = @ccall glfwGetWin32Window(window.handle::Ptr{Nothing})::Ptr{Nothing}
+glfwGetWin32Window(window::GLFW.Window) = @ccall "glfw3".glfwGetWin32Window(window.handle::Ptr{Nothing})::Ptr{Nothing}
 
 # TODO: Fix defaults
 init = bgfx_init_s(
