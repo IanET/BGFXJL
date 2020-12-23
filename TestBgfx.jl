@@ -36,10 +36,10 @@ init = bgfx_init_t(
 	0,
     0
 )
-bgfx_init(init)
-const kClearView = 0;
-bgfx_set_view_clear(kClearView, BGFX_CLEAR_COLOR)
-bgfx_set_view_rect(kClearView, 0, 0, BGFX_BACKBUFFER_RATIO_EQUAL)
+bgfx_init(Ref(init))
+const kClearView = UInt16(0);
+bgfx_set_view_clear(kClearView, BGFX_CLEAR_COLOR, 0x000000FF, Float32(1.0), UInt8(0))
+bgfx_set_view_rect_ratio(kClearView, UInt16(0), UInt16(0), BGFX_BACKBUFFER_RATIO_EQUAL)
 
 # Loop until the user closes the window
 while !GLFW.WindowShouldClose(window)
@@ -54,3 +54,4 @@ while !GLFW.WindowShouldClose(window)
 end
 
 GLFW.DestroyWindow(window)
+ 
