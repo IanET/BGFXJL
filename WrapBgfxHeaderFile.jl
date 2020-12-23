@@ -1,18 +1,21 @@
 println("Loading")
-using Clang,  Clang.LibClang, Printf
+using Clang, Clang.LibClang, Printf
 
 if VERSION > v"1.5"
     Base.exit_on_sigint(false) # catch ctrl-c, needs julia 1.5
 end
 
 # ----------------------------------------------------------------------------
-const msvc = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Enterprise\\"
+# const msvc = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Enterprise\\"
+const msvc = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\"
 const vcinc = msvc * "VC\\Tools\\MSVC\\14.28.29333\\include"
-const ucrt = msvc * "SDK\\ScopeCppSDK\\vc15\\SDK\\include\\ucrt"
+# const ucrt = msvc * "SDK\\ScopeCppSDK\\vc15\\SDK\\include\\ucrt" 
+const ucrt = "C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.18362.0\\ucrt\\"
+
 const bx = "bgfx"
 const includes = [vcinc, ucrt, bx]
 
-const args = ["-fms-compatibility", "-ferror-limit=10"]
+const  args = ["-fms-compatibility", "-ferror-limit=10"]
 
 function wrap_stuff(rootHeader::String, filterHeaders::Array{String}, libName::String)
     println("Wrapping $filterHeaders starting from $rootHeader")
@@ -53,12 +56,11 @@ function wrap_stuff(rootHeader::String, filterHeaders::Array{String}, libName::S
     println("Writing $path")
     open(path, "w") do f
         println(f, "# Automatically generated using Clang.jl\n")
-        println(f, "const $libName = \"$libName\" ")
+        # println(f, "const $libName = \"$libName\" ")
         print_buffer(f, dump_to_buffer(ctx.common_buffer))
         print_buffer(f, ctx.api_buffer)
     end
     println("Done")
 end
 
-wrap_stuff("bgfx.h", ["./bgfx/c99/../defines.h", "bgfx.h", "./bgfx/c99/bgfx.h"], "Bgfx")
-
+wrap_stuff("bgfx.h", ["./bgfx/c99/../defines.h", "bgfx.h", "./bgfx/c99/bgfx.h"], "bgfx")
