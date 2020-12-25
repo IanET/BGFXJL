@@ -18,26 +18,26 @@ function bgfx_dbg_text_printf(_x::UInt16, _y::UInt16, _attr::UInt8, _format::Str
     @ccall bgfx.bgfx_dbg_text_printf(_x::UInt16, _y::UInt16, _attr::UInt8, _format::Cstring)::Cvoid
 end
 
+function glfwGetWin32Window(window::GLFW.Window) 
+    @ccall "glfw3".glfwGetWin32Window(window.handle::Ptr{Nothing})::Ptr{Nothing}
+end
+
 include("Bgfx.jl")
    
 function main()
-    width = 640
-    height = 480
+    width = 800
+    height = 600
     viewID = UInt16(0)
 
+    GLFW.Init()
     GLFW.WindowHint(GLFW.CLIENT_API, GLFW.NO_API);
     window = GLFW.CreateWindow(width, height, "GLFW.jl")
-    bgfx_render_frame(Int32(-1));
 
-    # Missing wrapper so do it by hand
-    glfwGetWin32Window(window::GLFW.Window) = @ccall "glfw3".glfwGetWin32Window(window.handle::Ptr{Nothing})::Ptr{Nothing}
-
-    # TODO: Fix defaults
     init = bgfx_init_t(
         BGFX_RENDERER_TYPE_NOOP,
         0,
         0,
-        false,
+        false,  
         false,
         bgfx_platform_data_t(0, glfwGetWin32Window(window), 0, 0, 0),
         bgfx_resolution_t(BGFX_TEXTURE_FORMAT_UNKNOWN, width, height, BGFX_RESET_VSYNC, 0, 0),
@@ -45,7 +45,9 @@ function main()
         0,
         0
     )
-    bgfx_init(Ref(init))
+    rinit = Ref(init)
+    bgfx_init_ctor(rinit)
+    bgfx_init(rinit)
     bgfx_set_debug(BGFX_DEBUG_TEXT);
 
     bgfx_set_view_clear(viewID, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0x303030ff, Float32(1.0), UInt8(0))
@@ -62,7 +64,7 @@ function main()
         bgfx_frame(false)
     end
 
-    bgfx_shutdown()
+    bgfx_shutdown() 
     GLFW.DestroyWindow(window)
     GLFW.Terminate()
 end
