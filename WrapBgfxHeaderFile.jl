@@ -6,8 +6,8 @@ if VERSION > v"1.5"
 end
 
 # ----------------------------------------------------------------------------
-# const msvc = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Enterprise\\"
-const msvc = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\"
+const msvc = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Enterprise\\"
+# const msvc = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\"
 const vcinc = msvc * "VC\\Tools\\MSVC\\14.28.29333\\include"
 # const ucrt = msvc * "SDK\\ScopeCppSDK\\vc15\\SDK\\include\\ucrt" 
 const ucrt = "C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.18362.0\\ucrt\\"
