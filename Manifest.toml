@@ -18,7 +18,7 @@ version = "0.4.1"
 deps = ["CEnum", "Clang_jll", "DataStructures", "Libdl"]
 git-tree-sha1 = "aca0782dd9f42e92728e94d025668781bedd1a55"
 repo-rev = "wip"
-repo-url = "C:\\Users\\ian\\src\\Julia\\Clang.jl"
+repo-url = "https://github.com/4thjuly/Clang.jl.git"
 uuid = "40e3b903-d033-50b4-a0cc-940c62c95e31"
 version = "0.12.2"
 
