@@ -2,9 +2,26 @@
 
 
 const BGFX_SHARED_LIB_API = 1
-
-# Skipping MacroDefinition: BGFX_INVALID_HANDLE { UINT16_MAX }
-
+const bgfx = "bgfx-shared-librelease.dll"
+const UINT64_C(x) = begin
+            #= none:1 =#
+            UInt64(x)
+        end
+const UINT32_C(x) = begin
+            #= none:1 =#
+            UInt32(x)
+        end
+const UINT16_C(x) = begin
+            #= none:1 =#
+            UInt16(x)
+        end
+const UINT8_C(x) = begin
+            #= none:1 =#
+            UInt8(x)
+        end
+const dllexport = nothing
+const dllimport = nothing
+const BGFX_INVALID_HANDLE = typemax(UInt16)
 const BGFX_SHARED_LIB_BUILD = 0
 const BGFX_SHARED_LIB_USE = 0
 const BGFX_SYMBOL_EXPORT = dllexport
