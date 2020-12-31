@@ -1,4 +1,4 @@
-using GLFW, GLFW_jll, CEnum
+using GLFW, GLFW_jll, CEnum, LinearAlgebra
 
 const BGFX_STATE_BLEND_FUNC_SEPARATE(_srcRGB, _dstRGB, _srcA, _dstA) = (UInt64(_srcRGB) | UInt64(_dstRGB) << 4) | ((UInt64(_srcA) | UInt64(_dstA) << 4) << 8)
 const BGFX_STATE_BLEND_EQUATION_SEPARATE(_equationRGB, _equationA) = (_equationRGB | (_equationA << 3))
@@ -13,42 +13,140 @@ end
 
 include("Bgfx.jl")
    
+const Vector3 = Tuple{Float32, Float32, Float32}
+const Vector4 = Tuple{Float32, Float32, Float32, Float32}
+const Matrix4x4 = Matrix{Float32}
+Matrix4x4() = Matrix{Float32}(undef, 4, 4)
+Matrix4x4(x::Float32) = fill(x, (4, 4))
+Matrix4x4(I::UniformScaling{Bool}) = Matrix{Float32}(I, 4, 4)
+
+struct PosColorVertex
+    x::Float32
+    y::Float32
+    z::Float32
+    abgr::UInt32
+end
+
+function createLookAt(camera::Vector3, target::Vector3, up::Vector3)::Matrix4x4
+    camera = collect(camera)
+    target = collect(target)
+    zaxis = normalize(camera - target)
+    xaxis = normalize(cross(collect(up), zaxis))
+    yaxis = cross(zaxis, xaxis)
+
+    lookat = Matrix4x4()
+    lookat[1,1] = xaxis[1]
+    lookat[1,2] = yaxis[1]
+    lookat[1,3] = zaxis[1]
+    lookat[1,4] = 0
+    
+    lookat[2,1] = xaxis[2]
+    lookat[2,2] = yaxis[2]
+    lookat[2,3] = zaxis[2]
+    lookat[2,4] = 0
+
+    lookat[3,1] = xaxis[3]
+    lookat[3,2] = yaxis[3]
+    lookat[3,3] = zaxis[3]
+    lookat[3,4] = 0
+
+    lookat[4,1] = -dot(xaxis, camera)
+    lookat[4,1] = -dot(yaxis, camera)
+    lookat[4,1] = -dot(zaxis, camera)
+    lookat[4,4] = 1
+
+    return lookat
+end
+
+function createPerspectiveFieldOfView(fieldOfView::Float32, aspectRatio::Float32, nearPlaneDistance::Float32, 
+        farPlaneDistance::Float32)::Matrix4x4
+    yScale = 1.0f0 / tan(fieldOfView * 0.5f0);
+    xScale = yScale / aspectRatio;
+
+    fov = Matrix4x4(0.0f0)
+    fov[1,1] = xScale
+    fov[2,2] = yScale;
+    fov[3,3] = farPlaneDistance / (nearPlaneDistance - farPlaneDistance)
+    fov[3,4] = -1.0
+    fov[4,3] = nearPlaneDistance * farPlaneDistance / (nearPlaneDistance - farPlaneDistance)
+
+    return fov;
+end
+
+function createFromYawPitchRoll(yaw::Float32, pitch::Float32, roll::Float32)::Matrix4x4
+    halfRoll = roll / 2.0
+    sr = sin(halfRoll)
+    cr = cos(halfRoll)
+
+    halfPitch = pitch / 2.0
+    sp = sin(halfPitch)
+    cp = cos(halfPitch)
+
+    halfYaw = yaw / 2.0
+    sy = sin(halfYaw)
+    cy = cos(halfYaw)
+
+    x = cy * sp * cr + sy * cp * sr
+    y = sy * cp * cr - cy * sp * sr
+    z = cy * cp * sr - sy * sp * cr
+    w = cy * cp * cr + sy * sp * sr
+
+    xx = x * x
+    yy = y * y
+    zz = z * z
+
+    xy = x * y
+    wz = z * w
+    xz = z * x
+    wy = y * w
+    yz = y * z
+    wx = x * w
+
+    result = Matrix4x4(I)
+    result[1,1] = 1.0 - 2.0 * (yy + zz)
+    result[1,2] = 2.0 * (xy + wz)
+    result[1,3] = 2.0 * (xz - wy)
+    result[2,1] = 2.0 * (xy - wz)
+    result[2,2] = 1.0 - 2.0 * (zz + xx)
+    result[2,3] = 2.0 * (yz + wx)
+    result[3,1] = 2.0 * (xz + wy)
+    result[3,2] = 2.0 * (yz - wx)
+    result[3,3] = 1.0 - 2.0 * (yy + xx)
+
+    return result
+end
+
+Base.convert(::Type{PosColorVertex}, x::Array) = PosColorVertex(Float32(x[1]), Float32(x[2]), Float32(x[3]), Float32(x[4]))
+
 function main()
     width = 800
     height = 600
     viewID = UInt16(0)
 
     GLFW.Init()
-    GLFW.WindowHint(GLFW.CLIENT_API, GLFW.NO_API);
+    GLFW.WindowHint(GLFW.CLIENT_API, GLFW.NO_API)
     window = GLFW.CreateWindow(width, height, "GLFW")
     pd = bgfx_platform_data_t(0, glfwGetWin32Window(window), 0, 0, 0)
     res = bgfx_resolution_t(BGFX_TEXTURE_FORMAT_RGBA8, width, height, BGFX_RESET_VSYNC, 0, 0)
     limits = bgfx_init_limits_t(0, 0, 0, 0)
     init = bgfx_init_t(BGFX_RENDERER_TYPE_COUNT, 0, 0, false, false, pd, res, limits, 0, 0)
     bgfx_init(Ref(init))
-    bgfx_set_debug(BGFX_DEBUG_TEXT);
+    bgfx_set_debug(BGFX_DEBUG_TEXT)
 
-    bgfx_set_view_clear(viewID, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0x443355FF, Float32(1.0), UInt8(0))
-
-    struct PosColorVertex
-        x::Float32
-        y::Float32
-        z::Float32
-        abgr::UInt32
-    end
+    bgfx_set_view_clear(viewID, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0x443355FF, 1.0f0, UInt8(0))
         
-    const cubeVertices::PosColorVertex[] = [
-        [-1.0f,  1.0f,  1.0f, 0xff000000],
-        [ 1.0f,  1.0f,  1.0f, 0xff0000ff],
-        [-1.0f, -1.0f,  1.0f, 0xff00ff00],
-        [ 1.0f, -1.0f,  1.0f, 0xff00ffff],
-        [-1.0f,  1.0f, -1.0f, 0xffff0000],
-        [ 1.0f,  1.0f, -1.0f, 0xffff00ff],
-        [-1.0f, -1.0f, -1.0f, 0xffffff00],
-        [ 1.0f, -1.0f, -1.0f, 0xffffffff]
+    cubeVertices = PosColorVertex[
+        [-1.0,  1.0,  1.0, 0xff000000],
+        [ 1.0,  1.0,  1.0, 0xff0000ff],
+        [-1.0, -1.0,  1.0, 0xff00ff00],
+        [ 1.0, -1.0,  1.0, 0xff00ffff],
+        [-1.0,  1.0, -1.0, 0xffff0000],
+        [ 1.0,  1.0, -1.0, 0xffff00ff],
+        [-1.0, -1.0, -1.0, 0xffffff00],
+        [ 1.0, -1.0, -1.0, 0xffffffff]
     ]
     
-    const cubeTriList::UInt16[] = [
+    cubeTriList = UInt16[
         0, 1, 2,
         1, 3, 2,
         4, 6, 5,
@@ -61,39 +159,69 @@ function main()
         4, 5, 1,
         2, 3, 6,
         6, 3, 7,
-    ];
+    ]
 
+    vsbytes = read("vs_cubes.bin")
+    vsmem = bgfx_make_ref(Ref(vsbytes), UInt32(length(vsbytes)))
+    vs = bgfx_create_shader(vsmem)
 
-    # // load shaders
-    # var program = ResourceLoader.LoadProgram("vs_cubes", "fs_cubes");
+    fsbytes = read("fs_cubes.bin")
+    fsmem = bgfx_make_ref(Ref(fsbytes), UInt32(length(fsbytes)))
+    fs = bgfx_create_shader(fsmem)
+    program = bgfx_create_program(vs, fs, false)
 
-    layout = Ref(bgfx_vertex_layout_t(0, 0, tuple(zeros(18)), tuple(zeros(18))))
+    layout = Ref(bgfx_vertex_layout_t(0, 0, tuple(zeros(UInt16, 18)...), tuple(zeros(UInt16, 18)...)))
     bgfx_vertex_layout_begin(layout, BGFX_RENDERER_TYPE_NOOP)
-    bgfx_vertex_layout_add(layout, BGFX_ATTRIB_POSITION, 3, BGFX_ATTRIB_TYPE_FLOAT, false, false)
-    bgfx_vertex_layout_add(layout, BGFX_ATTRIB_COLOR0, 4, BGFX_ATTRIB_TYPE_UINT8, true, false)
+    bgfx_vertex_layout_add(layout, BGFX_ATTRIB_POSITION, UInt8(3), BGFX_ATTRIB_TYPE_FLOAT, false, false)
+    bgfx_vertex_layout_add(layout, BGFX_ATTRIB_COLOR0, UInt8(4), BGFX_ATTRIB_TYPE_UINT8, true, false)
     bgfx_vertex_layout_end(layout)
-    memVerts = bgfx_make_ref(Ref(cubeVertices), sizeof(cubeVertices))
-    bgfx_create_vertex_buffer(memVerts, layout, BGFX_BUFFER_NONE)
+    memVerts = bgfx_make_ref(Ref(cubeVertices), UInt32(sizeof(cubeVertices)))
+    vbh = bgfx_create_vertex_buffer(memVerts, layout, BGFX_BUFFER_NONE)
 
-    memTris = bgfx_make_ref(Ref(cubeTriList), sizeof(cubeTriList))
-    bgfx_create_index_buffer(memTris, BGFX_BUFFER_NONE)
+    memTris = bgfx_make_ref(Ref(cubeTriList), UInt32(sizeof(cubeTriList)))
+    ibh = bgfx_create_index_buffer(memTris, BGFX_BUFFER_NONE)
 
     # Loop until the user closes the window
+    lastFrameTime = time()
+    startTime = time()
     while !GLFW.WindowShouldClose(window)
         GLFW.PollEvents()
-        bgfx_set_view_rect(viewID, UInt16(0), UInt16(0), UInt16(width), UInt16(height));
-
-        # var viewMatrix = Matrix4x4.CreateLookAt(new Vector3(0.0f, 0.0f, -35.0f), Vector3.Zero, Vector3.UnitY);
-        # var projMatrix = Matrix4x4.CreatePerspectiveFieldOfView((float)Math.PI / 3, (float)sample.WindowWidth / sample.WindowHeight, 0.1f, 100.0f);
-        # Bgfx.SetViewTransform(0, &viewMatrix.M11, &projMatrix.M11);
-
-
+        bgfx_set_view_rect(viewID, UInt16(0), UInt16(0), UInt16(width), UInt16(height))
         bgfx_touch(viewID)
+
+        viewMatrix = createLookAt((0.0f0, 0.0f0, -35.0f0), (0.0f0, 0.0f0, 0.0f0), (0.0f0, 1.0f0, 0.0f0))
+        projMatrix = createPerspectiveFieldOfView(Float32(π / 3.0), Float32(width / height), 0.1f0, 100.0f0)
+        bgfx_set_view_transform(viewID, Ref(viewMatrix), Ref(projMatrix))
+
+        now = time()
+        framedt = now - lastFrameTime
+        lastFrameTime = now
+        startdt = now - startTime
+
         bgfx_dbg_text_clear(UInt8(0), false);
-        bgfx_dbg_text_printf(UInt16(0), UInt16(1), 0x1f, "bgfx/examples/25-c99");
+        bgfx_dbg_text_printf(UInt16(0), UInt16(1), 0x1f, "Julia Cubes: $(UInt32(round(framedt*1000)))");
+
+        for y = 0:11 
+            for x = 0:11
+                transform = createFromYawPitchRoll(Float32(startdt + x * 0.21), Float32(startdt + y * 0.37), 0.0f0)
+                transform[4,1] = -15.0 + x * 3.0
+                transform[4,2] = -15.0 + y * 3.0
+                transform[4,3] = 0.0
+                bgfx_set_transform(Ref(transform), UInt16(1))
+
+                bgfx_set_vertex_buffer(0x00, vbh, UInt32(0), UInt32(length(cubeVertices)))
+                bgfx_set_index_buffer(ibh, UInt32(0), UInt32(length(cubeTriList)))
+                bgfx_set_state(BGFX_STATE_DEFAULT, UInt32(0))
+
+                bgfx_submit(viewID, program, UInt32(0), BGFX_DISCARD_ALL);
+            end
+        end
+                
         bgfx_frame(false)
     end
 
+    bgfx_destroy_index_buffer(ibh)
+    bgfx_destroy_vertex_buffer(vbh)
     bgfx_shutdown() 
     GLFW.DestroyWindow(window)
     GLFW.Terminate()
