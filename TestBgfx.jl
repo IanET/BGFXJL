@@ -26,6 +26,7 @@ struct PosColorVertex
     z::Float32
     abgr::UInt32
 end
+Base.convert(::Type{PosColorVertex}, x::Array) = PosColorVertex(Float32(x[1]), Float32(x[2]), Float32(x[3]), Float32(x[4]))
 
 function createLookAt(camera::Vector3, target::Vector3, up::Vector3)::Matrix4x4
     camera = collect(camera)
@@ -116,8 +117,6 @@ function createFromYawPitchRoll(yaw::Float32, pitch::Float32, roll::Float32)::Ma
     return result
 end
 
-Base.convert(::Type{PosColorVertex}, x::Array) = PosColorVertex(Float32(x[1]), Float32(x[2]), Float32(x[3]), Float32(x[4]))
-
 function main()
     width = 800
     height = 600
@@ -161,12 +160,12 @@ function main()
         6, 3, 7,
     ]
 
-    vsbytes = read("vs_cubes.bin")
-    vsmem = bgfx_make_ref(Ref(vsbytes), UInt32(length(vsbytes)))
+    vsbytes = read("vs_cubes_dx11.bin")
+    vsmem = bgfx_copy(vsbytes, length(vsbytes) |> UInt32)
     vs = bgfx_create_shader(vsmem)
 
-    fsbytes = read("fs_cubes.bin")
-    fsmem = bgfx_make_ref(Ref(fsbytes), UInt32(length(fsbytes)))
+    fsbytes = read("fs_cubes_dx11.bin")
+    fsmem = bgfx_copy(fsbytes, length(fsbytes) |> UInt32)
     fs = bgfx_create_shader(fsmem)
     program = bgfx_create_program(vs, fs, false)
 
@@ -175,10 +174,10 @@ function main()
     bgfx_vertex_layout_add(layout, BGFX_ATTRIB_POSITION, UInt8(3), BGFX_ATTRIB_TYPE_FLOAT, false, false)
     bgfx_vertex_layout_add(layout, BGFX_ATTRIB_COLOR0, UInt8(4), BGFX_ATTRIB_TYPE_UINT8, true, false)
     bgfx_vertex_layout_end(layout)
-    memVerts = bgfx_make_ref(Ref(cubeVertices), UInt32(sizeof(cubeVertices)))
+    memVerts = bgfx_copy(cubeVertices, sizeof(cubeVertices) |> UInt32)
     vbh = bgfx_create_vertex_buffer(memVerts, layout, BGFX_BUFFER_NONE)
 
-    memTris = bgfx_make_ref(Ref(cubeTriList), UInt32(sizeof(cubeTriList)))
+    memTris = bgfx_copy(cubeTriList, sizeof(cubeTriList) |> UInt32)
     ibh = bgfx_create_index_buffer(memTris, BGFX_BUFFER_NONE)
 
     # Loop until the user closes the window
@@ -191,15 +190,15 @@ function main()
 
         viewMatrix = createLookAt((0.0f0, 0.0f0, -35.0f0), (0.0f0, 0.0f0, 0.0f0), (0.0f0, 1.0f0, 0.0f0))
         projMatrix = createPerspectiveFieldOfView(Float32(π / 3.0), Float32(width / height), 0.1f0, 100.0f0)
-        bgfx_set_view_transform(viewID, Ref(viewMatrix), Ref(projMatrix))
+        bgfx_set_view_transform(viewID, viewMatrix, projMatrix)
 
         now = time()
         framedt = now - lastFrameTime
         lastFrameTime = now
         startdt = now - startTime
 
-        bgfx_dbg_text_clear(UInt8(0), false);
-        bgfx_dbg_text_printf(UInt16(0), UInt16(1), 0x1f, "Julia Cubes: $(UInt32(round(framedt*1000)))");
+        bgfx_dbg_text_clear(0x00, false);
+        bgfx_dbg_text_printf(0x0000, 0x0001, 0x1f, "Julia Cubes: $(UInt32(round(framedt*1000)))");
 
         for y = 0:11 
             for x = 0:11
@@ -207,10 +206,10 @@ function main()
                 transform[4,1] = -15.0 + x * 3.0
                 transform[4,2] = -15.0 + y * 3.0
                 transform[4,3] = 0.0
-                bgfx_set_transform(Ref(transform), UInt16(1))
+                bgfx_set_transform(transform, 0x0001)
 
-                bgfx_set_vertex_buffer(0x00, vbh, UInt32(0), UInt32(length(cubeVertices)))
-                bgfx_set_index_buffer(ibh, UInt32(0), UInt32(length(cubeTriList)))
+                bgfx_set_vertex_buffer(0x00, vbh, UInt32(0), length(cubeVertices) |> UInt32)
+                bgfx_set_index_buffer(ibh, UInt32(0), length(cubeTriList) |> UInt32)
                 bgfx_set_state(BGFX_STATE_DEFAULT, UInt32(0))
 
                 bgfx_submit(viewID, program, UInt32(0), BGFX_DISCARD_ALL);
