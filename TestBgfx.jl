@@ -1,4 +1,4 @@
-using GLFW, GLFW_jll, CEnum, LinearAlgebra
+using GLFW, GLFW_jll, CEnum, LinearAlgebra, StaticArrays
 
 const BGFX_STATE_BLEND_FUNC_SEPARATE(_srcRGB, _dstRGB, _srcA, _dstA) = (UInt64(_srcRGB) | UInt64(_dstRGB) << 4) | ((UInt64(_srcA) | UInt64(_dstA) << 4) << 8)
 const BGFX_STATE_BLEND_EQUATION_SEPARATE(_equationRGB, _equationA) = (_equationRGB | (_equationA << 3))
@@ -12,15 +12,16 @@ function glfwGetWin32Window(window::GLFW.Window)
 end
 
 include("Bgfx.jl")
-   
-const Vector3 = Tuple{Float32, Float32, Float32}
-const Vector4 = Tuple{Float32, Float32, Float32, Float32}
-const Matrix4x4 = Matrix{Float32}
 
-# NB Julia is column major and c expects row order
-Matrix4x4() = Matrix{Float32}(undef, 4, 4)
-Matrix4x4(x::Float32) = fill(x, (4, 4))
-Matrix4x4(I::UniformScaling{Bool}) = Matrix{Float32}(I, 4, 4)
+const Vector3 = MVector{3,Float32}
+const Matrix4x4 = MMatrix{4, 4, Float32} # NB Julia is column major and c expects row order
+const UP_VECTOR = Vector3(0.0f0, 1.0f0, 0.0f0)
+
+Matrix4x4() = zeros(Matrix4x4)
+
+# Matrix4x4() = Matrix{Float32}(undef, 4, 4)
+# Matrix4x4(x::Float32) = fill(x, (4, 4))
+# Matrix4x4(I::UniformScaling{Bool}) = Matrix{Float32}(I, 4, 4)
 
 struct PosColorVertex
     x::Float32
@@ -30,18 +31,14 @@ struct PosColorVertex
 end
 Base.convert(::Type{PosColorVertex}, x::Array) = PosColorVertex(Float32(x[1]), Float32(x[2]), Float32(x[3]), Float32(x[4]))
 
-function createLookAt(camera::Vector3, target::Vector3, up::Vector3)::Matrix4x4
-    camera = collect(camera)
-    target = collect(target)
-    up = collect(up)
+function calcLookAt!(camera::Vector3, target::Vector3, up::Vector3, lookat::Matrix4x4)
     zaxis = normalize(camera - target)
     xaxis = normalize(cross(up, zaxis))
     yaxis = cross(zaxis, xaxis)
 
-    lookat = Matrix4x4()
     lookat[1,1] = xaxis[1]
     lookat[2,1] = yaxis[1]
-    lookat[3,1] = zaxis[1]    
+    lookat[3,1] = zaxis[1]
     lookat[4,1] = 0.0f0
 
     lookat[1,2] = xaxis[2]
@@ -57,11 +54,9 @@ function createLookAt(camera::Vector3, target::Vector3, up::Vector3)::Matrix4x4
     lookat[1,4] = -dot(xaxis, camera)
     lookat[2,4] = -dot(yaxis, camera)
     lookat[3,4] = -dot(zaxis, camera)
-    lookat[4,4] = 1.0
-
-    # @show lookat
+    lookat[4,4] = 1.0    
     
-return lookat
+    return lookat
 end
 
 function createPerspectiveFieldOfView(fieldOfView::Float32, aspectRatio::Float32, nearPlaneDistance::Float32, 
@@ -69,7 +64,7 @@ function createPerspectiveFieldOfView(fieldOfView::Float32, aspectRatio::Float32
     yScale = 1.0f0 / tan(fieldOfView * 0.5f0);
     xScale = yScale / aspectRatio;
 
-    fov = Matrix4x4(0.0f0)
+    fov = Matrix4x4()
     fov[1,1] = xScale
     fov[2,2] = yScale;
     fov[3,3] = farPlaneDistance / (nearPlaneDistance - farPlaneDistance)
@@ -198,12 +193,15 @@ function main()
     # Loop until the user closes the window
     lastFrameTime = time()
     startTime = time()
+    viewMatrix = Matrix4x4()
+    camera = Vector3(0.0f0, 0.0f0, -35.0f0)
+    target = Vector3(0.0f0, 0.0f0, 0.0f0)
+    
     while !GLFW.WindowShouldClose(window)
         GLFW.PollEvents()
-        bgfx_set_view_rect(viewID, 0x0000, 0x0000, UInt16(width), UInt16(height))
 
-        viewMatrix = createLookAt((0.0f0, 0.0f0, -35.0f0), (0.0f0, 0.0f0, 0.0f0), (0.0f0, 1.0f0, 0.0f0))
-        projMatrix = createPerspectiveFieldOfView(Float32(π / 3.0), Float32(width / height), 0.1f0, 100.0f0)
+        bgfx_set_view_rect(viewID, 0x0000, 0x0000, UInt16(width), UInt16(height))
+        @time calcLookAt!(camera, target, UP_VECTOR, viewMatrix)
         projMatrix = createPerspectiveFieldOfView(Float32(π / 3), Float32(width / height), 0.10f0, 100.0f0)
         bgfx_set_view_transform(viewID, viewMatrix, projMatrix)
 
