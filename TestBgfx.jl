@@ -1,4 +1,4 @@
-using GLFW, GLFW_jll, CEnum, LinearAlgebra, StaticArrays
+using GLFW, GLFW_jll, CEnum, LinearAlgebra, StaticArrays, Printf
 
 const BGFX_STATE_BLEND_FUNC_SEPARATE(_srcRGB, _dstRGB, _srcA, _dstA) = (UInt64(_srcRGB) | UInt64(_dstRGB) << 4) | ((UInt64(_srcA) | UInt64(_dstA) << 4) << 8)
 const BGFX_STATE_BLEND_EQUATION_SEPARATE(_equationRGB, _equationA) = (_equationRGB | (_equationA << 3))
@@ -18,10 +18,6 @@ const Matrix4x4 = MMatrix{4, 4, Float32} # NB Julia is column major and c expect
 const UP_VECTOR = Vector3(0.0f0, 1.0f0, 0.0f0)
 
 Matrix4x4() = zeros(Matrix4x4)
-
-# Matrix4x4() = Matrix{Float32}(undef, 4, 4)
-# Matrix4x4(x::Float32) = fill(x, (4, 4))
-# Matrix4x4(I::UniformScaling{Bool}) = Matrix{Float32}(I, 4, 4)
 
 struct PosColorVertex
     x::Float32
@@ -55,26 +51,21 @@ function calcLookAt!(camera::Vector3, target::Vector3, up::Vector3, lookat::Matr
     lookat[2,4] = -dot(yaxis, camera)
     lookat[3,4] = -dot(zaxis, camera)
     lookat[4,4] = 1.0    
-    
-    return lookat
 end
 
-function createPerspectiveFieldOfView(fieldOfView::Float32, aspectRatio::Float32, nearPlaneDistance::Float32, 
-        farPlaneDistance::Float32)::Matrix4x4
+function calcPerspectiveFieldOfView!(fieldOfView::Float32, aspectRatio::Float32, nearPlaneDistance::Float32, 
+        farPlaneDistance::Float32, fov::Matrix4x4)
     yScale = 1.0f0 / tan(fieldOfView * 0.5f0);
     xScale = yScale / aspectRatio;
 
-    fov = Matrix4x4()
     fov[1,1] = xScale
     fov[2,2] = yScale;
     fov[3,3] = farPlaneDistance / (nearPlaneDistance - farPlaneDistance)
     fov[3,4] = (nearPlaneDistance * farPlaneDistance) / (nearPlaneDistance - farPlaneDistance)
     fov[4,3] = -1.0
-
-    return fov;
 end
 
-function createFromYawPitchRoll(yaw::Float32, pitch::Float32, roll::Float32)::Matrix4x4
+function transformFromYawPitchRoll!(yaw::Float32, pitch::Float32, roll::Float32, transform::Matrix4x4)
     halfRoll = roll / 2.0
     sr = sin(halfRoll)
     cr = cos(halfRoll)
@@ -103,28 +94,25 @@ function createFromYawPitchRoll(yaw::Float32, pitch::Float32, roll::Float32)::Ma
     yz = y * z
     wx = x * w
 
-    result = Matrix4x4()
-    result[1,1] = 1.0 - 2.0 * (yy + zz)
-    result[2,1] = 2.0 * (xy + wz)
-    result[3,1] = 2.0 * (xz - wy)
-    result[4,1] = 0.0
+    transform[1,1] = 1.0 - 2.0 * (yy + zz)
+    transform[2,1] = 2.0 * (xy + wz)
+    transform[3,1] = 2.0 * (xz - wy)
+    transform[4,1] = 0.0
 
-    result[1,2] = 2.0 * (xy - wz)
-    result[2,2] = 1.0 - 2.0 * (zz + xx)
-    result[3,2] = 2.0 * (yz + wx)
-    result[4,2] = 0.0
+    transform[1,2] = 2.0 * (xy - wz)
+    transform[2,2] = 1.0 - 2.0 * (zz + xx)
+    transform[3,2] = 2.0 * (yz + wx)
+    transform[4,2] = 0.0
 
-    result[1,3] = 2.0 * (xz + wy)
-    result[2,3] = 2.0 * (yz - wx)
-    result[3,3] = 1.0 - 2.0 * (yy + xx)
-    result[4,3] = 0.0
+    transform[1,3] = 2.0 * (xz + wy)
+    transform[2,3] = 2.0 * (yz - wx)
+    transform[3,3] = 1.0 - 2.0 * (yy + xx)
+    transform[4,3] = 0.0
 
-    result[1,4] = 0.0
-    result[2,4] = 0.0
-    result[3,4] = 0.0
-    result[4,4] = 1.0
-
-    return result
+    transform[1,4] = 0.0
+    transform[2,4] = 0.0
+    transform[3,4] = 0.0
+    transform[4,4] = 1.0
 end
 
 function main()
@@ -190,19 +178,22 @@ function main()
     memTris = bgfx_copy(cubeTriList, sizeof(cubeTriList) |> UInt32)
     ibh = bgfx_create_index_buffer(memTris, BGFX_BUFFER_NONE)
 
-    # Loop until the user closes the window
     lastFrameTime = time()
     startTime = time()
     viewMatrix = Matrix4x4()
     camera = Vector3(0.0f0, 0.0f0, -35.0f0)
     target = Vector3(0.0f0, 0.0f0, 0.0f0)
+    projMatrix = Matrix4x4()
+    transform = Matrix4x4()
     
+    # Loop until the user closes the window
     while !GLFW.WindowShouldClose(window)
-        GLFW.PollEvents()
+        @time begin
 
+        GLFW.PollEvents()
         bgfx_set_view_rect(viewID, 0x0000, 0x0000, UInt16(width), UInt16(height))
-        @time calcLookAt!(camera, target, UP_VECTOR, viewMatrix)
-        projMatrix = createPerspectiveFieldOfView(Float32(π / 3), Float32(width / height), 0.10f0, 100.0f0)
+        calcLookAt!(camera, target, UP_VECTOR, viewMatrix)
+        calcPerspectiveFieldOfView!(Float32(π / 3), Float32(width / height), 0.10f0, 100.0f0, projMatrix)
         bgfx_set_view_transform(viewID, viewMatrix, projMatrix)
 
         bgfx_touch(viewID)
@@ -213,11 +204,11 @@ function main()
         startdt = now - startTime
 
         bgfx_dbg_text_clear(0x00, false);
-        bgfx_dbg_text_printf(0x0000, 0x0001, 0x1f, "Julia Cubes: $(UInt32(round(framedt*1000)))");
+        bgfx_dbg_text_printf(0x0000, 0x0001, 0x1f, @sprintf("Julia Cubes: %d", trunc(framedt*1000)));
 
         for y = 0:11
             for x = 0:11
-                transform = createFromYawPitchRoll(Float32(startdt + x * 0.21), Float32(startdt + y * 0.37), 0.0f0)
+                transformFromYawPitchRoll!(Float32(startdt + x * 0.21), Float32(startdt + y * 0.37), 0.0f0, transform)
                 transform[1,4] = -15.0 + x * 3.0
                 transform[2,4] = -15.0 + y * 3.0
                 transform[3,4] = 0.0
@@ -232,6 +223,9 @@ function main()
         end
                 
         bgfx_frame(false)
+
+        end
+
     end
 
     bgfx_destroy_index_buffer(ibh)
