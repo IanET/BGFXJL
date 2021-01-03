@@ -13,11 +13,13 @@ end
 
 include("Bgfx.jl")
 
-const Vector3 = MVector{3,Float32}
-const Matrix4x4 = MMatrix{4, 4, Float32} # NB Julia is column major and c expects row order
+const Vector3 = SVector{3,Float32}
+const MVector3 = MVector{3,Float32}
+const Matrix4x4 = SMatrix{4, 4, Float32} # NB Julia is column major and c expects row order
+const MMatrix4x4 = MMatrix{4, 4, Float32} # NB Julia is column major and c expects row order
 const UP_VECTOR = Vector3(0.0f0, 1.0f0, 0.0f0)
 
-Matrix4x4() = zeros(Matrix4x4)
+MMatrix4x4() = zeros(MMatrix4x4)
 
 struct PosColorVertex
     x::Float32
@@ -27,7 +29,7 @@ struct PosColorVertex
 end
 Base.convert(::Type{PosColorVertex}, x::Array) = PosColorVertex(Float32(x[1]), Float32(x[2]), Float32(x[3]), Float32(x[4]))
 
-function calcLookAt!(camera::Vector3, target::Vector3, up::Vector3, lookat::Matrix4x4)
+function calcLookAt!(camera::Vector3, target::Vector3, up::Vector3, lookat::MMatrix4x4)
     zaxis = normalize(camera - target)
     xaxis = normalize(cross(up, zaxis))
     yaxis = cross(zaxis, xaxis)
@@ -54,7 +56,7 @@ function calcLookAt!(camera::Vector3, target::Vector3, up::Vector3, lookat::Matr
 end
 
 function calcPerspectiveFieldOfView!(fieldOfView::Float32, aspectRatio::Float32, nearPlaneDistance::Float32, 
-        farPlaneDistance::Float32, fov::Matrix4x4)
+        farPlaneDistance::Float32, fov::MMatrix4x4)
     yScale = 1.0f0 / tan(fieldOfView * 0.5f0);
     xScale = yScale / aspectRatio;
 
@@ -65,7 +67,7 @@ function calcPerspectiveFieldOfView!(fieldOfView::Float32, aspectRatio::Float32,
     fov[4,3] = -1.0
 end
 
-function transformFromYawPitchRoll!(yaw::Float32, pitch::Float32, roll::Float32, transform::Matrix4x4)
+function transformFromYawPitchRoll!(yaw::Float32, pitch::Float32, roll::Float32, transform::MMatrix4x4)
     halfRoll = roll / 2.0
     sr = sin(halfRoll)
     cr = cos(halfRoll)
@@ -180,11 +182,9 @@ function main()
 
     lastFrameTime = time()
     startTime = time()
-    viewMatrix = Matrix4x4()
-    camera = Vector3(0.0f0, 0.0f0, -35.0f0)
-    target = Vector3(0.0f0, 0.0f0, 0.0f0)
-    projMatrix = Matrix4x4()
-    transform = Matrix4x4()
+    viewMatrix = MMatrix4x4()
+    projMatrix = MMatrix4x4()
+    transform = MMatrix4x4()
     
     # Loop until the user closes the window
     while !GLFW.WindowShouldClose(window)
@@ -192,7 +192,7 @@ function main()
 
         GLFW.PollEvents()
         bgfx_set_view_rect(viewID, 0x0000, 0x0000, UInt16(width), UInt16(height))
-        calcLookAt!(camera, target, UP_VECTOR, viewMatrix)
+        calcLookAt!(Vector3(0.0f0, 0.0f0, -35.0f0), Vector3(0.0f0, 0.0f0, 0.0f0), UP_VECTOR, viewMatrix)
         calcPerspectiveFieldOfView!(Float32(π / 3), Float32(width / height), 0.10f0, 100.0f0, projMatrix)
         bgfx_set_view_transform(viewID, viewMatrix, projMatrix)
 
