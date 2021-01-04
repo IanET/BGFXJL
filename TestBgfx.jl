@@ -48,11 +48,11 @@ end
 function calcPerspectiveFieldOfView(fieldOfView::Float32, aspectRatio::Float32, nearPlaneDistance::Float32, farPlaneDistance::Float32)::Matrix4x4
     ys = 1.0f0 / tan(fieldOfView * 0.5f0);
     xs = ys / aspectRatio;
-
     v1 = farPlaneDistance / (nearPlaneDistance - farPlaneDistance)
     v2 = (nearPlaneDistance * farPlaneDistance) / (nearPlaneDistance - farPlaneDistance)
     v3 = -1.0f0
     f0 = 0.0f0
+
     return @SMatrix [ xs f0 f0 f0;
                       f0 ys f0 f0;
                       f0 f0 v1 v2;
@@ -77,9 +77,7 @@ function transformFromYawPitchRoll(yaw::Float32, pitch::Float32, roll::Float32):
     z = cy * cp * sr - sy * sp * cr
     w = cy * cp * cr + sy * sp * sr
 
-    xx = x * x
-    yy = y * y
-    zz = z * z
+    x² = x^2; y² = y^2; z² = z^2
 
     xy = x * y
     wz = z * w
@@ -88,19 +86,19 @@ function transformFromYawPitchRoll(yaw::Float32, pitch::Float32, roll::Float32):
     yz = y * z
     wx = x * w
 
-    m11 = Float32(1.0 - 2.0 * (yy + zz))
+    m11 = Float32(1.0 - 2.0 * (y² + z²))
     m21 = Float32(2.0 * (xy + wz))
     m31 = Float32(2.0 * (xz - wy))
     m41 = 0.0f0
 
     m12 = Float32(2.0 * (xy - wz))
-    m22 = Float32(1.0 - 2.0 * (zz + xx))
+    m22 = Float32(1.0 - 2.0 * (z² + x²))
     m32 = Float32(2.0 * (yz + wx))
     m42 = 0.0f0
 
     m13 = Float32(2.0 * (xz + wy))
     m23 = Float32(2.0 * (yz - wx))
-    m33 = Float32(1.0 - 2.0 * (yy + xx))
+    m33 = Float32(1.0 - 2.0 * (y² + x²))
     m43 = 0.0f0
 
     m14 = 0.0f0
@@ -113,6 +111,32 @@ function transformFromYawPitchRoll(yaw::Float32, pitch::Float32, roll::Float32):
                       m31 m32 m33 m34;
                       m41 m42 m43 m44 ]
 end
+    
+const CUBE_VERTICES = PosColorVertex[
+    [-1.0,  1.0,  1.0, 0xff000000],
+    [ 1.0,  1.0,  1.0, 0xff0000ff],
+    [-1.0, -1.0,  1.0, 0xff00ff00],
+    [ 1.0, -1.0,  1.0, 0xff00ffff],
+    [-1.0,  1.0, -1.0, 0xffff0000],
+    [ 1.0,  1.0, -1.0, 0xffff00ff],
+    [-1.0, -1.0, -1.0, 0xffffff00],
+    [ 1.0, -1.0, -1.0, 0xffffffff]
+]
+
+const CUBE_TRIS = UInt16[
+    0, 1, 2,
+    1, 3, 2,
+    4, 6, 5,
+    5, 6, 7,
+    0, 2, 4,
+    4, 2, 6,
+    1, 5, 3,
+    5, 7, 3,
+    0, 4, 1,
+    4, 5, 1,
+    2, 3, 6,
+    6, 3, 7,
+]
 
 function main()
     width = 1280
@@ -130,32 +154,6 @@ function main()
     bgfx_set_debug(BGFX_DEBUG_TEXT)
 
     bgfx_set_view_clear(viewID, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0x443355FF, 1.0f0, UInt8(0))
-        
-    cubeVertices = PosColorVertex[
-        [-1.0,  1.0,  1.0, 0xff000000],
-        [ 1.0,  1.0,  1.0, 0xff0000ff],
-        [-1.0, -1.0,  1.0, 0xff00ff00],
-        [ 1.0, -1.0,  1.0, 0xff00ffff],
-        [-1.0,  1.0, -1.0, 0xffff0000],
-        [ 1.0,  1.0, -1.0, 0xffff00ff],
-        [-1.0, -1.0, -1.0, 0xffffff00],
-        [ 1.0, -1.0, -1.0, 0xffffffff]
-    ]
-
-    cubeTriList = UInt16[
-        0, 1, 2,
-        1, 3, 2,
-        4, 6, 5,
-        5, 6, 7,
-        0, 2, 4,
-        4, 2, 6,
-        1, 5, 3,
-        5, 7, 3,
-        0, 4, 1,
-        4, 5, 1,
-        2, 3, 6,
-        6, 3, 7,
-    ]
 
     vsbytes = read("vs_cubes_dx11.bin")
     vsmem = bgfx_copy(vsbytes, length(vsbytes) |> UInt32)
@@ -171,10 +169,9 @@ function main()
     bgfx_vertex_layout_add(layout, BGFX_ATTRIB_POSITION, 0x03, BGFX_ATTRIB_TYPE_FLOAT, false, false)
     bgfx_vertex_layout_add(layout, BGFX_ATTRIB_COLOR0, 0x04, BGFX_ATTRIB_TYPE_UINT8, true, false)
     bgfx_vertex_layout_end(layout)
-    memVerts = bgfx_copy(cubeVertices, sizeof(cubeVertices) |> UInt32)
+    memVerts = bgfx_copy(CUBE_VERTICES, sizeof(CUBE_VERTICES) |> UInt32)
     vbh = bgfx_create_vertex_buffer(memVerts, layout, BGFX_BUFFER_NONE)
-
-    memTris = bgfx_copy(cubeTriList, sizeof(cubeTriList) |> UInt32)
+    memTris = bgfx_copy(CUBE_TRIS, sizeof(CUBE_TRIS) |> UInt32)
     ibh = bgfx_create_index_buffer(memTris, BGFX_BUFFER_NONE)
 
     lastFrameTime = time()
@@ -212,8 +209,8 @@ function main()
                                 t1[4,1] t1[4,2] t1[4,3] t1[4,4] ]
                 bgfx_set_transform(t2, 0x0001)
 
-                bgfx_set_vertex_buffer(0x00, vbh, UInt32(0), length(cubeVertices) |> UInt32)
-                bgfx_set_index_buffer(ibh, UInt32(0), length(cubeTriList) |> UInt32)
+                bgfx_set_vertex_buffer(0x00, vbh, UInt32(0), length(CUBE_VERTICES) |> UInt32)
+                bgfx_set_index_buffer(ibh, UInt32(0), length(CUBE_TRIS) |> UInt32)
 
                 bgfx_set_state(BGFX_STATE_DEFAULT, UInt32(0))
                 bgfx_submit(viewID, program, UInt32(0), BGFX_DISCARD_ALL)
