@@ -34,11 +34,15 @@ function calcLookAt(camera::Vector3, target::Vector3, up::Vector3)::Matrix4x4
     zaxis::Vector3 = normalize(camera - target)
     xaxis::Vector3 = normalize(cross(up, zaxis))
     yaxis::Vector3 = cross(zaxis, xaxis)
-
-    return @SMatrix [ xaxis[1] xaxis[2] xaxis[3] -dot(xaxis, camera);
-                      yaxis[1] yaxis[2] yaxis[3] -dot(yaxis, camera);
-                      zaxis[1] zaxis[2] zaxis[3] -dot(zaxis, camera);
-                      0.0f0    0.0f0    0.0f0     1.0f0]
+    v1 = -dot(xaxis, camera)
+    v2 = -dot(yaxis, camera)
+    v3 = -dot(zaxis, camera)
+    f0 = 0.0f0
+    f1 = 1.0f0
+    return @SMatrix [ xaxis[1] xaxis[2] xaxis[3] v1;
+                      yaxis[1] yaxis[2] yaxis[3] v2;
+                      zaxis[1] zaxis[2] zaxis[3] v3;
+                      f0       f0       f0       f1 ]
 end
 
 function calcPerspectiveFieldOfView(fieldOfView::Float32, aspectRatio::Float32, nearPlaneDistance::Float32, farPlaneDistance::Float32)::Matrix4x4
