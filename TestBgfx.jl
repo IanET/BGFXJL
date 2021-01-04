@@ -19,6 +19,7 @@ const MVector3 = MVector{3,Float32}
 const Matrix4x4 = SMatrix{4, 4, Float32} 
 const MMatrix4x4 = MMatrix{4, 4, Float32}
 const UP_VECTOR = Vector3(0.0f0, 1.0f0, 0.0f0)
+const F32 = Float32
 
 MMatrix4x4() = zeros(MMatrix4x4)
 
@@ -86,25 +87,25 @@ function transformFromYawPitchRoll(yaw::Float32, pitch::Float32, roll::Float32):
     yz = y * z
     wx = x * w
 
-    m11 = Float32(1.0 - 2.0 * (y² + z²))
-    m21 = Float32(2.0 * (xy + wz))
-    m31 = Float32(2.0 * (xz - wy))
-    m41 = 0.0f0
+    m11::F32 = 1 - 2(y² + z²)
+    m21::F32 = 2(xy + wz)
+    m31::F32 = 2(xz - wy)
+    m41::F32 = 0
 
-    m12 = Float32(2.0 * (xy - wz))
-    m22 = Float32(1.0 - 2.0 * (z² + x²))
-    m32 = Float32(2.0 * (yz + wx))
-    m42 = 0.0f0
+    m12::F32 = 2(xy - wz)
+    m22::F32 = 1 - 2(z² + x²)
+    m32::F32 = 2(yz + wx)
+    m42::F32 = 0
 
-    m13 = Float32(2.0 * (xz + wy))
-    m23 = Float32(2.0 * (yz - wx))
-    m33 = Float32(1.0 - 2.0 * (y² + x²))
-    m43 = 0.0f0
+    m13::F32 = 2(xz + wy)
+    m23::F32 = 2(yz - wx)
+    m33::F32 = 1 - 2(y² + x²)
+    m43::F32 = 0
 
-    m14 = 0.0f0
-    m24 = 0.0f0
-    m34 = 0.0f0
-    m44 = 1.0f0
+    m14::F32 = 0
+    m24::F32 = 0
+    m34::F32 = 0
+    m44::F32 = 1
 
     return @SMatrix [ m11 m12 m13 m14;
                       m21 m22 m23 m24;
@@ -141,7 +142,7 @@ const CUBE_TRIS = UInt16[
 function main()
     width = 1280
     height = 720
-    viewID = UInt16(0)
+    viewID = 0x0000
 
     GLFW.Init()
     GLFW.WindowHint(GLFW.CLIENT_API, GLFW.NO_API)
