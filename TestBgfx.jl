@@ -13,10 +13,11 @@ end
 
 include("Bgfx.jl")
 
+# NB Julia is column major and c expects row order so matrix math will be rotated to avoid a copy
 const Vector3 = SVector{3,Float32}
 const MVector3 = MVector{3,Float32}
-const Matrix4x4 = SMatrix{4, 4, Float32} # NB Julia is column major and c expects row order
-const MMatrix4x4 = MMatrix{4, 4, Float32} # NB Julia is column major and c expects row order
+const Matrix4x4 = SMatrix{4, 4, Float32} 
+const MMatrix4x4 = MMatrix{4, 4, Float32}
 const UP_VECTOR = Vector3(0.0f0, 1.0f0, 0.0f0)
 
 MMatrix4x4() = zeros(MMatrix4x4)
@@ -29,45 +30,118 @@ struct PosColorVertex
 end
 Base.convert(::Type{PosColorVertex}, x::Array) = PosColorVertex(Float32(x[1]), Float32(x[2]), Float32(x[3]), Float32(x[4]))
 
-function calcLookAt!(camera::Vector3, target::Vector3, up::Vector3, lookat::MMatrix4x4)
-    zaxis = normalize(camera - target)
-    xaxis = normalize(cross(up, zaxis))
-    yaxis = cross(zaxis, xaxis)
+# function calcLookAt!(camera::Vector3, target::Vector3, up::Vector3, lookat::MMatrix4x4)
+#     zaxis = normalize(camera - target)
+#     xaxis = normalize(cross(up, zaxis))
+#     yaxis = cross(zaxis, xaxis)
 
-    lookat[1,1] = xaxis[1]
-    lookat[2,1] = yaxis[1]
-    lookat[3,1] = zaxis[1]
-    lookat[4,1] = 0.0f0
+#     lookat[1,1] = xaxis[1]
+#     lookat[2,1] = yaxis[1]
+#     lookat[3,1] = zaxis[1]
+#     lookat[4,1] = 0.0f0
 
-    lookat[1,2] = xaxis[2]
-    lookat[2,2] = yaxis[2]
-    lookat[3,2] = zaxis[2]
-    lookat[4,2] = 0.0f0
+#     lookat[1,2] = xaxis[2]
+#     lookat[2,2] = yaxis[2]
+#     lookat[3,2] = zaxis[2]
+#     lookat[4,2] = 0.0f0
 
-    lookat[1,3] = xaxis[3]
-    lookat[2,3] = yaxis[3]
-    lookat[3,3] = zaxis[3]
-    lookat[4,3] = 0.0f0
+#     lookat[1,3] = xaxis[3]
+#     lookat[2,3] = yaxis[3]
+#     lookat[3,3] = zaxis[3]
+#     lookat[4,3] = 0.0f0
 
-    lookat[1,4] = -dot(xaxis, camera)
-    lookat[2,4] = -dot(yaxis, camera)
-    lookat[3,4] = -dot(zaxis, camera)
-    lookat[4,4] = 1.0    
+#     lookat[1,4] = -dot(xaxis, camera)
+#     lookat[2,4] = -dot(yaxis, camera)
+#     lookat[3,4] = -dot(zaxis, camera)
+#     lookat[4,4] = 1.0    
+# end
+
+function calcLookAt(camera::Vector3, target::Vector3, up::Vector3)::Matrix4x4
+    zaxis::Vector3 = normalize(camera - target)
+    xaxis::Vector3 = normalize(cross(up, zaxis))
+    yaxis::Vector3 = cross(zaxis, xaxis)
+
+    return @SMatrix [ xaxis[1] xaxis[2] xaxis[3] -dot(xaxis, camera);
+                      yaxis[1] yaxis[2] yaxis[3] -dot(yaxis, camera);
+                      zaxis[1] zaxis[2] zaxis[3] -dot(zaxis, camera);
+                      0.0      0.0      0.0      1.0]
 end
 
-function calcPerspectiveFieldOfView!(fieldOfView::Float32, aspectRatio::Float32, nearPlaneDistance::Float32, 
-        farPlaneDistance::Float32, fov::MMatrix4x4)
+# function calcPerspectiveFieldOfView!(fieldOfView::Float32, aspectRatio::Float32, nearPlaneDistance::Float32, 
+#         farPlaneDistance::Float32, fov::MMatrix4x4)
+#     yScale = 1.0f0 / tan(fieldOfView * 0.5f0);
+#     xScale = yScale / aspectRatio;
+
+#     fov[1,1] = xScale
+#     fov[2,2] = yScale;
+#     fov[3,3] = farPlaneDistance / (nearPlaneDistance - farPlaneDistance)
+#     fov[3,4] = (nearPlaneDistance * farPlaneDistance) / (nearPlaneDistance - farPlaneDistance)
+#     fov[4,3] = -1.0
+# end
+
+function calcPerspectiveFieldOfView(fieldOfView::Float32, aspectRatio::Float32, nearPlaneDistance::Float32, farPlaneDistance::Float32)::Matrix4x4
     yScale = 1.0f0 / tan(fieldOfView * 0.5f0);
     xScale = yScale / aspectRatio;
 
-    fov[1,1] = xScale
-    fov[2,2] = yScale;
-    fov[3,3] = farPlaneDistance / (nearPlaneDistance - farPlaneDistance)
-    fov[3,4] = (nearPlaneDistance * farPlaneDistance) / (nearPlaneDistance - farPlaneDistance)
-    fov[4,3] = -1.0
+    v1 = farPlaneDistance / (nearPlaneDistance - farPlaneDistance)
+    v2 = (nearPlaneDistance * farPlaneDistance) / (nearPlaneDistance - farPlaneDistance)
+    return @SMatrix [ xScale  0.0     0.0     0.0;
+                      0.0     yScale  0.0     0.0;
+                      0.0     0.0     v1      v2;
+                      0.0     0.0     -1.0    0.0 ]
 end
 
-function transformFromYawPitchRoll!(yaw::Float32, pitch::Float32, roll::Float32, transform::MMatrix4x4)
+# function transformFromYawPitchRoll!(yaw::Float32, pitch::Float32, roll::Float32, transform::MMatrix4x4)
+#     halfRoll = roll / 2.0
+#     sr = sin(halfRoll)
+#     cr = cos(halfRoll)
+
+#     halfPitch = pitch / 2.0
+#     sp = sin(halfPitch)
+#     cp = cos(halfPitch)
+
+#     halfYaw = yaw / 2.0
+#     sy = sin(halfYaw)
+#     cy = cos(halfYaw)
+
+#     x = cy * sp * cr + sy * cp * sr
+#     y = sy * cp * cr - cy * sp * sr
+#     z = cy * cp * sr - sy * sp * cr
+#     w = cy * cp * cr + sy * sp * sr
+
+#     xx = x * x
+#     yy = y * y
+#     zz = z * z
+
+#     xy = x * y
+#     wz = z * w
+#     xz = z * x
+#     wy = y * w
+#     yz = y * z
+#     wx = x * w
+
+#     transform[1,1] = 1.0 - 2.0 * (yy + zz)
+#     transform[2,1] = 2.0 * (xy + wz)
+#     transform[3,1] = 2.0 * (xz - wy)
+#     transform[4,1] = 0.0
+
+#     transform[1,2] = 2.0 * (xy - wz)
+#     transform[2,2] = 1.0 - 2.0 * (zz + xx)
+#     transform[3,2] = 2.0 * (yz + wx)
+#     transform[4,2] = 0.0
+
+#     transform[1,3] = 2.0 * (xz + wy)
+#     transform[2,3] = 2.0 * (yz - wx)
+#     transform[3,3] = 1.0 - 2.0 * (yy + xx)
+#     transform[4,3] = 0.0
+
+#     transform[1,4] = 0.0
+#     transform[2,4] = 0.0
+#     transform[3,4] = 0.0
+#     transform[4,4] = 1.0
+# end
+
+function transformFromYawPitchRoll(yaw::Float32, pitch::Float32, roll::Float32)::Matrix4x4
     halfRoll = roll / 2.0
     sr = sin(halfRoll)
     cr = cos(halfRoll)
@@ -96,25 +170,30 @@ function transformFromYawPitchRoll!(yaw::Float32, pitch::Float32, roll::Float32,
     yz = y * z
     wx = x * w
 
-    transform[1,1] = 1.0 - 2.0 * (yy + zz)
-    transform[2,1] = 2.0 * (xy + wz)
-    transform[3,1] = 2.0 * (xz - wy)
-    transform[4,1] = 0.0
+    m11 = 1.0 - 2.0 * (yy + zz)
+    m21 = 2.0 * (xy + wz)
+    m31 = 2.0 * (xz - wy)
+    m41 = 0.0
 
-    transform[1,2] = 2.0 * (xy - wz)
-    transform[2,2] = 1.0 - 2.0 * (zz + xx)
-    transform[3,2] = 2.0 * (yz + wx)
-    transform[4,2] = 0.0
+    m12 = 2.0 * (xy - wz)
+    m22 = 1.0 - 2.0 * (zz + xx)
+    m32 = 2.0 * (yz + wx)
+    m42 = 0.0
 
-    transform[1,3] = 2.0 * (xz + wy)
-    transform[2,3] = 2.0 * (yz - wx)
-    transform[3,3] = 1.0 - 2.0 * (yy + xx)
-    transform[4,3] = 0.0
+    m13 = 2.0 * (xz + wy)
+    m23 = 2.0 * (yz - wx)
+    m33 = 1.0 - 2.0 * (yy + xx)
+    m43 = 0.0
 
-    transform[1,4] = 0.0
-    transform[2,4] = 0.0
-    transform[3,4] = 0.0
-    transform[4,4] = 1.0
+    m14 = 0.0
+    m24 = 0.0
+    m34 = 0.0
+    m44 = 1.0
+
+    return @SMatrix [ m11 m12 m13 m14;
+                      m21 m22 m23 m24;
+                      m31 m32 m33 m34;
+                      m41 m42 m43 m44 ]
 end
 
 function main()
@@ -182,9 +261,6 @@ function main()
 
     lastFrameTime = time()
     startTime = time()
-    viewMatrix = MMatrix4x4()
-    projMatrix = MMatrix4x4()
-    transform = MMatrix4x4()
     
     # Loop until the user closes the window
     while !GLFW.WindowShouldClose(window)
@@ -192,8 +268,8 @@ function main()
 
         GLFW.PollEvents()
         bgfx_set_view_rect(viewID, 0x0000, 0x0000, UInt16(width), UInt16(height))
-        calcLookAt!(Vector3(0.0f0, 0.0f0, -35.0f0), Vector3(0.0f0, 0.0f0, 0.0f0), UP_VECTOR, viewMatrix)
-        calcPerspectiveFieldOfView!(Float32(π / 3), Float32(width / height), 0.10f0, 100.0f0, projMatrix)
+        viewMatrix = calcLookAt(Vector3(0.0f0, 0.0f0, -35.0f0), Vector3(0.0f0, 0.0f0, 0.0f0), UP_VECTOR)
+        projMatrix = calcPerspectiveFieldOfView(Float32(π / 3), Float32(width / height), 0.10f0, 100.0f0)
         bgfx_set_view_transform(viewID, viewMatrix, projMatrix)
 
         bgfx_touch(viewID)
@@ -203,22 +279,25 @@ function main()
         lastFrameTime = now
         startdt = now - startTime
 
-        bgfx_dbg_text_clear(0x00, false);
-        bgfx_dbg_text_printf(0x0000, 0x0001, 0x1f, @sprintf("Julia Cubes: %d", trunc(framedt*1000)));
+        bgfx_dbg_text_clear(0x00, false)
+        bgfx_dbg_text_printf(0x0000, 0x0001, 0x1f, @sprintf("Julia Cubes: %d", trunc(framedt*1000))) # 4 allocations
 
         for y = 0:11
             for x = 0:11
-                transformFromYawPitchRoll!(Float32(startdt + x * 0.21), Float32(startdt + y * 0.37), 0.0f0, transform)
-                transform[1,4] = -15.0 + x * 3.0
-                transform[2,4] = -15.0 + y * 3.0
-                transform[3,4] = 0.0
-                bgfx_set_transform(transform, 0x0001)
+                t1 = transformFromYawPitchRoll(Float32(startdt + x * 0.21), Float32(startdt + y * 0.37), 0.0f0)
+                v1 = Float32(-15.0 + x * 3.0)
+                v2 = Float32(-15.0 + y * 3.0)
+                t2 = @SMatrix [ t1[1,1] t1[1,2] t1[1,3] v1;
+                                t1[2,1] t1[2,2] t1[2,3] v2;
+                                t1[3,1] t1[3,2] t1[3,3] 0.0f0;
+                                t1[4,1] t1[4,2] t1[4,3] t1[4,4] ]
+                bgfx_set_transform(t2, 0x0001)
 
                 bgfx_set_vertex_buffer(0x00, vbh, UInt32(0), length(cubeVertices) |> UInt32)
                 bgfx_set_index_buffer(ibh, UInt32(0), length(cubeTriList) |> UInt32)
 
                 bgfx_set_state(BGFX_STATE_DEFAULT, UInt32(0))
-                bgfx_submit(viewID, program, UInt32(0), BGFX_DISCARD_ALL);
+                bgfx_submit(viewID, program, UInt32(0), BGFX_DISCARD_ALL)
             end
         end
                 
