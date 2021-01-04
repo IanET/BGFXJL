@@ -140,8 +140,8 @@ const CUBE_TRIS = UInt16[
 ]
 
 function main()
-    width = 1280
-    height = 720
+    width::UInt16 = 1280
+    height::UInt16 = 720
     viewID = 0x0000
 
     GLFW.Init()
@@ -175,6 +175,9 @@ function main()
     memTris = bgfx_copy(CUBE_TRIS, sizeof(CUBE_TRIS) |> UInt32)
     ibh = bgfx_create_index_buffer(memTris, BGFX_BUFFER_NONE)
 
+    viewMatrix = calcLookAt(Vector3(0.0f0, 0.0f0, -35.0f0), Vector3(0.0f0, 0.0f0, 0.0f0), UP_VECTOR)
+    projMatrix = calcPerspectiveFieldOfView(Float32(π / 3), Float32(width / height), 0.10f0, 100.0f0)
+
     lastFrameTime = time()
     startTime = time()
     
@@ -183,11 +186,8 @@ function main()
         # @time begin
 
         GLFW.PollEvents()
-        bgfx_set_view_rect(viewID, 0x0000, 0x0000, UInt16(width), UInt16(height))
-        viewMatrix = calcLookAt(Vector3(0.0f0, 0.0f0, -35.0f0), Vector3(0.0f0, 0.0f0, 0.0f0), UP_VECTOR)
-        projMatrix = calcPerspectiveFieldOfView(Float32(π / 3), Float32(width / height), 0.10f0, 100.0f0)
+        bgfx_set_view_rect(viewID, 0x0000, 0x0000, width, height)
         bgfx_set_view_transform(viewID, viewMatrix, projMatrix)
-
         bgfx_touch(viewID)
 
         now = time()
