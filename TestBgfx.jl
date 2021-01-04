@@ -38,8 +38,8 @@ function calcLookAt(camera::Vector3, target::Vector3, up::Vector3)::Matrix4x4
     v1 = -dot(xaxis, camera)
     v2 = -dot(yaxis, camera)
     v3 = -dot(zaxis, camera)
-    f0 = 0.0f0
-    f1 = 1.0f0
+    f0 = 0.0
+    f1 = 1.0
     return @SMatrix [ xaxis[1] xaxis[2] xaxis[3] v1;
                       yaxis[1] yaxis[2] yaxis[3] v2;
                       zaxis[1] zaxis[2] zaxis[3] v3;
@@ -47,12 +47,12 @@ function calcLookAt(camera::Vector3, target::Vector3, up::Vector3)::Matrix4x4
 end
 
 function calcPerspectiveFieldOfView(fieldOfView::Float32, aspectRatio::Float32, nearPlaneDistance::Float32, farPlaneDistance::Float32)::Matrix4x4
-    ys = 1.0f0 / tan(fieldOfView * 0.5f0);
+    ys = 1.0/ tan(fieldOfView * 0.5);
     xs = ys / aspectRatio;
     v1 = farPlaneDistance / (nearPlaneDistance - farPlaneDistance)
     v2 = (nearPlaneDistance * farPlaneDistance) / (nearPlaneDistance - farPlaneDistance)
-    v3 = -1.0f0
-    f0 = 0.0f0
+    v3 = -1.0
+    f0 = 0.0
 
     return @SMatrix [ xs f0 f0 f0;
                       f0 ys f0 f0;
@@ -87,25 +87,25 @@ function transformFromYawPitchRoll(yaw::Float32, pitch::Float32, roll::Float32):
     yz = y * z
     wx = x * w
 
-    m11::F32 = 1 - 2(y² + z²)
-    m21::F32 = 2(xy + wz)
-    m31::F32 = 2(xz - wy)
-    m41::F32 = 0
+    m11 = 1 - 2(y² + z²)
+    m21 = 2(xy + wz)
+    m31 = 2(xz - wy)
+    m41 = 0
 
-    m12::F32 = 2(xy - wz)
-    m22::F32 = 1 - 2(z² + x²)
-    m32::F32 = 2(yz + wx)
-    m42::F32 = 0
+    m12 = 2(xy - wz)
+    m22 = 1 - 2(z² + x²)
+    m32 = 2(yz + wx)
+    m42 = 0
 
-    m13::F32 = 2(xz + wy)
-    m23::F32 = 2(yz - wx)
-    m33::F32 = 1 - 2(y² + x²)
-    m43::F32 = 0
+    m13 = 2(xz + wy)
+    m23 = 2(yz - wx)
+    m33 = 1 - 2(y² + x²)
+    m43 = 0
 
-    m14::F32 = 0
-    m24::F32 = 0
-    m34::F32 = 0
-    m44::F32 = 1
+    m14 = 0.0
+    m24 = 0.0
+    m34 = 0.0
+    m44 = 1.0
 
     return @SMatrix [ m11 m12 m13 m14;
                       m21 m22 m23 m24;
@@ -183,8 +183,6 @@ function main()
     
     # Loop until the user closes the window
     while !GLFW.WindowShouldClose(window)
-        # @time begin
-
         GLFW.PollEvents()
         bgfx_set_view_rect(viewID, 0x0000, 0x0000, width, height)
         bgfx_set_view_transform(viewID, viewMatrix, projMatrix)
@@ -201,11 +199,11 @@ function main()
         for y = 0:11
             for x = 0:11
                 t1 = transformFromYawPitchRoll(Float32(startdt + x * 0.21), Float32(startdt + y * 0.37), 0.0f0)
-                v1 = Float32(-15.0 + x * 3.0)
-                v2 = Float32(-15.0 + y * 3.0)
+                tx = Float32(-15 + x * 3)
+                ty = Float32(-15 + y * 3)
                 f0 = 0.0f0
-                t2 = @SMatrix [ t1[1,1] t1[1,2] t1[1,3] v1;
-                                t1[2,1] t1[2,2] t1[2,3] v2;
+                t2 = @SMatrix [ t1[1,1] t1[1,2] t1[1,3] tx;
+                                t1[2,1] t1[2,2] t1[2,3] ty;
                                 t1[3,1] t1[3,2] t1[3,3] f0;
                                 t1[4,1] t1[4,2] t1[4,3] t1[4,4] ]
                 bgfx_set_transform(t2, 0x0001)
@@ -219,9 +217,6 @@ function main()
         end
                 
         bgfx_frame(false)
-
-        # end
-
     end
 
     bgfx_destroy_index_buffer(ibh)
