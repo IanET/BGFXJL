@@ -196,24 +196,22 @@ function main()
         bgfx_dbg_text_clear(0x00, false)
         bgfx_dbg_text_printf(0x0000, 0x0001, 0x1f, @sprintf("Julia Cubes: %d", trunc(framedt*1000))) # 4 allocations
 
-        for y = 0:11
-            for x = 0:11
-                t1 = transformFromYawPitchRoll(Float32(startdt + x * 0.21), Float32(startdt + y * 0.37), 0.0f0)
-                tx = Float32(-15 + x * 3)
-                ty = Float32(-15 + y * 3)
-                f0 = 0.0f0
-                t2 = @SMatrix [ t1[1,1] t1[1,2] t1[1,3] tx;
-                                t1[2,1] t1[2,2] t1[2,3] ty;
-                                t1[3,1] t1[3,2] t1[3,3] f0;
-                                t1[4,1] t1[4,2] t1[4,3] t1[4,4] ]
-                bgfx_set_transform(t2, 0x0001)
+        for y = 0:11, x = 0:11
+            t1 = transformFromYawPitchRoll(Float32(startdt + x * 0.21), Float32(startdt + y * 0.37), 0.0f0)
+            tx = Float32(-15 + x * 3)
+            ty = Float32(-15 + y * 3)
+            f0 = 0.0f0
+            t2 = @SMatrix [ t1[1,1] t1[1,2] t1[1,3] tx;
+                            t1[2,1] t1[2,2] t1[2,3] ty;
+                            t1[3,1] t1[3,2] t1[3,3] f0;
+                            t1[4,1] t1[4,2] t1[4,3] t1[4,4] ]
+            bgfx_set_transform(t2, 0x0001)
 
-                bgfx_set_vertex_buffer(0x00, vbh, UInt32(0), length(CUBE_VERTICES) |> UInt32)
-                bgfx_set_index_buffer(ibh, UInt32(0), length(CUBE_TRIS) |> UInt32)
+            bgfx_set_vertex_buffer(0x00, vbh, UInt32(0), length(CUBE_VERTICES) |> UInt32)
+            bgfx_set_index_buffer(ibh, UInt32(0), length(CUBE_TRIS) |> UInt32)
 
-                bgfx_set_state(BGFX_STATE_DEFAULT, UInt32(0))
-                bgfx_submit(viewID, program, UInt32(0), BGFX_DISCARD_ALL)
-            end
+            bgfx_set_state(BGFX_STATE_DEFAULT, UInt32(0))
+            bgfx_submit(viewID, program, UInt32(0), BGFX_DISCARD_ALL)
         end
                 
         bgfx_frame(false)
