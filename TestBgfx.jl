@@ -1,4 +1,5 @@
 using GLFW, GLFW_jll, CEnum, LinearAlgebra, StaticArrays, Printf
+import Base.@kwdef
 
 const BGFX_STATE_BLEND_FUNC_SEPARATE(_srcRGB, _dstRGB, _srcA, _dstA) = (UInt64(_srcRGB) | UInt64(_dstRGB) << 4) | ((UInt64(_srcA) | UInt64(_dstA) << 4) << 8)
 const BGFX_STATE_BLEND_EQUATION_SEPARATE(_equationRGB, _equationA) = (_equationRGB | (_equationA << 3))
@@ -139,10 +140,27 @@ const CUBE_TRIS = UInt16[
     6, 3, 7,
 ]
 
+@kwdef mutable struct FrameStats
+    time::Float64 = 0.0
+    frames::Int = 0
+    fps::Float32 = 0.0
+end
+
+function update(fs::FrameStats)
+    fs.frames += 1
+    d = time() - fs.time
+    if d > 1.0
+        fs.fps = fs.frames / d
+        fs.frames = 0
+        fs.time = time()
+    end 
+end
+
 function main()
     width::UInt16 = 1280
     height::UInt16 = 720
     viewID = 0x0000
+    stats = FrameStats()
 
     GLFW.Init()
     GLFW.WindowHint(GLFW.CLIENT_API, GLFW.NO_API)
@@ -189,12 +207,15 @@ function main()
         bgfx_touch(viewID)
 
         now = time()
-        framedt = now - lastFrameTime
+        # framedt = now - lastFrameTime
         lastFrameTime = now
         startdt = now - startTime
 
         bgfx_dbg_text_clear(0x00, false)
-        bgfx_dbg_text_printf(0x0000, 0x0001, 0x1f, @sprintf("Julia Cubes: %d", trunc(framedt*1000))) # 4 allocations
+        # bgfx_dbg_text_printf(0x0000, 0x0001, 0x1f, @sprintf("Julia Cubes: %d", trunc(framedt*1000))) # 2 allocations
+        # @time bgfx_dbg_text_printf(0x0000, 0x0001, 0x1f, @sprintf("Julia Cubes: %.1f", fpsinfo.fps)) # 2 allocations
+        bgfx_dbg_text_printf(0x0000, 0x0001, 0x1f, @sprintf("FPS: %d", round(Int, stats.fps))) # 2 allocations
+        # @time bgfx_dbg_text_printf(0x0000, 0x0001, 0x1f, "Julia Cubes: $(round(Int, fpsinfo.fps))") # 5 aollocations
 
         for y = 0:11, x = 0:11
             t1 = transformFromYawPitchRoll(Float32(startdt + x * 0.21), Float32(startdt + y * 0.37), 0.0f0)
@@ -215,6 +236,7 @@ function main()
         end
                 
         bgfx_frame(false)
+        update(stats)
     end
 
     bgfx_destroy_index_buffer(ibh)
